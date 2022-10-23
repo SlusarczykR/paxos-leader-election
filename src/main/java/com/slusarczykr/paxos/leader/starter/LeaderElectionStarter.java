@@ -1,7 +1,7 @@
 package com.slusarczykr.paxos.leader.starter;
 
-import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
-import com.slusarczykr.paxos.leader.election.task.StartLeaderElectionTask;
+import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
+import com.slusarczykr.paxos.leader.election.task.LeaderCandidacy;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,9 +11,13 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 @Component
 @RequiredArgsConstructor
@@ -24,37 +28,63 @@ public class LeaderElectionStarter {
     public static final int MIN_AWAIT_TIME = 15;
     public static final int MAX_AWAIT_TIME = 30;
 
-    private final Random random = new Random();
-
     private final ApplicationContext applicationContext;
-    private final ServerDetails serverDetails;
+
+    private final LeaderElectionService leaderElectionService;
+
+    private final AtomicReference<CompletableFuture<Boolean>> candidacy = new AtomicReference<>();
+
+    private final Random random = new Random();
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         log.info("Initializing leader election procedure...");
-        startLeaderElection();
+        startLeaderCandidacy();
     }
 
-    private void startLeaderElection() {
-        TimerTask startLeaderElectionTask = createStartLeaderElectionTask();
-        schedule(startLeaderElectionTask);
+    public void startLeaderCandidacy() {
+        LeaderCandidacy task = createStartLeaderElectionTask();
+        CompletableFuture<Boolean> leaderCandidacy = startLeaderCandidacy(task, awaitLeaderElectionTime());
+        leaderCandidacy.thenAccept(this::processLeaderElection);
+        cancelIfPresent(this.candidacy.getAndSet(leaderCandidacy));
     }
 
-    private StartLeaderElectionTask createStartLeaderElectionTask() {
-        StartLeaderElectionTask startLeaderElectionTask = new StartLeaderElectionTask();
-        autowire(startLeaderElectionTask);
-
-        return startLeaderElectionTask;
+    private CompletableFuture<Boolean> startLeaderCandidacy(LeaderCandidacy task, int timeout) {
+        log.info("Follower will start its candidacy for a leader for {} ms", timeout);
+        Executor delayedExecutor = CompletableFuture.delayedExecutor(timeout, MILLISECONDS);
+        return CompletableFuture.supplyAsync(task::start, delayedExecutor);
     }
 
-    private void autowire(StartLeaderElectionTask startLeaderElectionTask) {
+    private void processLeaderElection(boolean leader) {
+        if (Boolean.TRUE.equals(leader)) {
+            leaderElectionService.sendHeartbeats();
+        } else {
+            startLeaderCandidacy();
+        }
+    }
+
+    private LeaderCandidacy createStartLeaderElectionTask() {
+        LeaderCandidacy task = new LeaderCandidacy();
+        autowire(task);
+
+        return task;
+    }
+
+    private void autowire(LeaderCandidacy task) {
         AutowireCapableBeanFactory factory = applicationContext.getAutowireCapableBeanFactory();
-        factory.autowireBean(startLeaderElectionTask);
+        factory.autowireBean(task);
     }
 
-    private void schedule(TimerTask startLeaderElectionTask) {
-        Timer candidateTime = serverDetails.getCandidateForLeaderTimer();
-        candidateTime.schedule(startLeaderElectionTask, awaitLeaderElectionTime());
+    private void cancelIfPresent(CompletableFuture<?> task) {
+        Optional.ofNullable(task).ifPresent(it -> it.cancel(false));
+    }
+
+    public CompletableFuture<Boolean> getLeaderCandidacy() {
+        return candidacy.get();
+    }
+
+    public void cancelLeaderCandidacy() {
+        cancelIfPresent(candidacy.get());
     }
 
     private int awaitLeaderElectionTime() {

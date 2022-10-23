@@ -1,17 +1,19 @@
 package com.slusarczykr.paxos.leader.discovery.state;
 
 import com.slusarczykr.paxos.leader.discovery.config.ServerDiscoveryConfiguration;
+import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.util.Timer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
+@Data
 public class ServerDetails {
 
     private static final Logger log = LoggerFactory.getLogger(ServerDetails.class);
@@ -20,7 +22,7 @@ public class ServerDetails {
     private final AtomicLong term = new AtomicLong(0);
     private final AtomicLong commitIndex = new AtomicLong(0);
 
-    private final Timer candidateForLeaderTimer = new Timer(ServerDetails.class.getSimpleName());
+    private final AtomicBoolean leader = new AtomicBoolean(false);
 
     @Value("${server.port}")
     private int serverPort;
@@ -78,19 +80,11 @@ public class ServerDetails {
         return getCommitIndex().get();
     }
 
-    public AtomicInteger getId() {
-        return id;
+    public boolean isLeader() {
+        return getLeader().get();
     }
 
-    public AtomicLong getTerm() {
-        return term;
-    }
-
-    public AtomicLong getCommitIndex() {
-        return commitIndex;
-    }
-
-    public Timer getCandidateForLeaderTimer() {
-        return candidateForLeaderTimer;
+    public void setLeader(boolean leader) {
+        getLeader().set(leader);
     }
 }

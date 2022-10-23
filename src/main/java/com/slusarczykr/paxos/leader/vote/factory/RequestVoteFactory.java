@@ -1,6 +1,6 @@
 package com.slusarczykr.paxos.leader.vote.factory;
 
-import com.slusarczykr.paxos.leader.model.RequestVote;
+import com.slusarczykr.paxos.leader.api.RequestVote;
 import org.springframework.stereotype.Component;
 
 @Component

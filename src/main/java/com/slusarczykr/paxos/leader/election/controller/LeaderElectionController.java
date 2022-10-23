@@ -1,7 +1,7 @@
 package com.slusarczykr.paxos.leader.election.controller;
 
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
-import com.slusarczykr.paxos.leader.model.RequestVote;
+import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.vote.service.RequestVoteService;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import lombok.RequiredArgsConstructor;
