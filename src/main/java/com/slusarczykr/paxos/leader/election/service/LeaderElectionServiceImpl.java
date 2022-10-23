@@ -1,5 +1,6 @@
 package com.slusarczykr.paxos.leader.election.service;
 
+import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.api.client.PaxosClusterClient;
 import com.slusarczykr.paxos.leader.discovery.service.ServerDiscoveryService;
@@ -100,6 +101,25 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     @Override
     public void sendHeartbeats() {
         log.info("Start sending heartbeats to followers...");
+        AppendEntry appendEntry = createHeartbeat();
+        discoveryService.getServers().values().stream()
+                .map(serverLocation -> sendHeartbeats(appendEntry, serverLocation))
+                .flatMap(Optional::stream)
+                .forEach(it -> log.info("Receive heartbeat reply from follower with id: {}", it.getServerId()));
+    }
+
+    @Override
+    public AppendEntry createHeartbeat() {
+        return new AppendEntry(
+                serverDetails.getIdValue(),
+                serverDetails.getTermValue(),
+                serverDetails.getCommitIndexValue()
+        );
+    }
+
+    @SneakyThrows
+    private Optional<AppendEntry.Response> sendHeartbeats(AppendEntry appendEntry, String serverLocation) {
+        return clusterClient.sendHeartbeats(serverLocation, appendEntry, AppendEntry.Response.class);
     }
 
     private String getShouldCandidateForLeaderMessage(boolean candidateForLeader) {

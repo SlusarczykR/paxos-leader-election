@@ -1,5 +1,6 @@
 package com.slusarczykr.paxos.leader.election.service;
 
+import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import com.slusarczykr.paxos.leader.api.RequestVote;
 
@@ -10,6 +11,8 @@ public interface LeaderElectionService {
     boolean candidateForLeader() throws PaxosLeaderElectionException;
 
     boolean shouldCandidateForLeader();
+
+    AppendEntry createHeartbeat();
 
     void sendHeartbeats();
 }

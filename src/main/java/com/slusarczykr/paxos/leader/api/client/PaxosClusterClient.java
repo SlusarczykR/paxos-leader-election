@@ -2,6 +2,7 @@ package com.slusarczykr.paxos.leader.api.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import lombok.RequiredArgsConstructor;
@@ -26,23 +27,33 @@ public class PaxosClusterClient {
 
     public <T extends RequestVote.Response> Optional<T> requestCandidates(String serverLocation, RequestVote requestVote,
                                                                           Class<T> requestVoteResponse) throws PaxosLeaderElectionException {
+        String requestUrl = buildServerLeaderCandidacyVoteUrl(serverLocation);
+        return sendRequest(requestUrl, requestVote, requestVoteResponse);
+    }
+
+    public <T extends AppendEntry.Response> Optional<T> sendHeartbeats(String serverLocation, AppendEntry appendEntry,
+                                                                       Class<T> requestVoteResponse) throws PaxosLeaderElectionException {
+        String requestUrl = buildServerLeaderHeartbeatUrl(serverLocation);
+        return sendRequest(requestUrl, appendEntry, requestVoteResponse);
+    }
+
+    private <T> Optional<T> sendRequest(String requestUrl, AppendEntry appendEntry, Class<T> requestVoteResponse)
+            throws PaxosLeaderElectionException {
         try {
-            String requestUrl = buildServerLeaderCandidacyVoteUrl(serverLocation);
-            HttpEntity<String> request = toRequest(requestVote);
-            return Optional.ofNullable(restTemplate.postForObject(requestUrl, request, requestVoteResponse));
+            return Optional.ofNullable(restTemplate.postForObject(requestUrl, toRequest(appendEntry), requestVoteResponse));
         } catch (JsonProcessingException e) {
             throw new PaxosLeaderElectionException("Error while proposing the leader candidacy!");
         } catch (Exception e) {
-            log.warn("Server listening on address {} is not reachable!", serverLocation);
+            log.warn("Server listening on address {} is not reachable!", requestUrl);
         }
         return Optional.empty();
     }
 
-    private HttpEntity<String> toRequest(RequestVote requestVote) throws JsonProcessingException {
-        return new HttpEntity<>(toJSON(requestVote), prepareHeaders());
+    private HttpEntity<String> toRequest(AppendEntry appendEntry) throws JsonProcessingException {
+        return new HttpEntity<>(toJSON(appendEntry), prepareHeaders());
     }
 
-    private String toJSON(RequestVote requestVote) throws JsonProcessingException {
+    private String toJSON(AppendEntry requestVote) throws JsonProcessingException {
         return objectMapper.writeValueAsString(requestVote);
     }
 
@@ -51,6 +62,10 @@ public class PaxosClusterClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         return headers;
+    }
+
+    private String buildServerLeaderHeartbeatUrl(String serverLocation) {
+        return serverLocation + "/leaderElection/heartbeat";
     }
 
     private String buildServerLeaderCandidacyVoteUrl(String serverLocation) {
