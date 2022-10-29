@@ -1,4 +1,4 @@
-package com.slusarczykr.paxos.leader.election.controller;
+package com.slusarczykr.paxos.leader.election.resource;
 
 import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
@@ -21,9 +21,9 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 @RestController
 @RequestMapping("leaderElection")
 @RequiredArgsConstructor
-public class LeaderElectionController {
+public class LeaderElectionResource {
 
-    private static final Logger log = LoggerFactory.getLogger(LeaderElectionController.class);
+    private static final Logger log = LoggerFactory.getLogger(LeaderElectionResource.class);
 
     private final LeaderElectionService leaderElectionService;
     private final RequestVoteService requestVoteService;
@@ -55,7 +55,7 @@ public class LeaderElectionController {
     }
 
     @PostMapping(value = "/heartbeat", consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
-    public ResponseEntity<AppendEntry.Response> voteForLeaderCandidate(@RequestBody AppendEntry appendEntry) {
+    public ResponseEntity<AppendEntry.Response> sendHeartbeat(@RequestBody AppendEntry appendEntry) {
         log.info("Received heartbeat from leader with id: {}", appendEntry.getServerId());
         AppendEntry.Response appendEntryResponse = new AppendEntry.Response(serverDetails.getIdValue());
         return new ResponseEntity<>(appendEntryResponse, HttpStatus.OK);

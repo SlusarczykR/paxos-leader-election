@@ -1,4 +1,4 @@
-package com.slusarczykr.paxos.leader.controller;
+package com.slusarczykr.paxos.leader.resource;
 
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-public class ServerController {
+public class ServerResource {
 
-    private static final Logger log = LoggerFactory.getLogger(ServerController.class);
+    private static final Logger log = LoggerFactory.getLogger(ServerResource.class);
 
     @GetMapping(value = "/status")
     public ResponseEntity<Void> status() {

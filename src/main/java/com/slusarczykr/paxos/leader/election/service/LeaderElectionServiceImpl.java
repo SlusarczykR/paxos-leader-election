@@ -2,7 +2,7 @@ package com.slusarczykr.paxos.leader.election.service;
 
 import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
-import com.slusarczykr.paxos.leader.api.client.PaxosClusterClient;
+import com.slusarczykr.paxos.leader.api.client.PaxosClient;
 import com.slusarczykr.paxos.leader.discovery.service.ServerDiscoveryService;
 import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
@@ -23,7 +23,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderElectionServiceImpl.class);
 
-    private final PaxosClusterClient clusterClient;
+    private final PaxosClient clusterClient;
 
     private final ServerDetails serverDetails;
     private final ServerDiscoveryService discoveryService;
@@ -55,7 +55,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     @SneakyThrows
     private Optional<RequestVote.Response> requestCandidates(RequestVote requestVote, String serverLocation) {
-        return clusterClient.requestCandidates(serverLocation, requestVote, RequestVote.Response.class);
+        return clusterClient.requestCandidates(serverLocation, requestVote);
     }
 
     private <T extends RequestVote.Response> boolean checkAcceptanceMajority(List<T> responseRequestVotes) {
@@ -105,7 +105,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
         discoveryService.getServers().values().stream()
                 .map(serverLocation -> sendHeartbeats(appendEntry, serverLocation))
                 .flatMap(Optional::stream)
-                .forEach(it -> log.info("Receive heartbeat reply from follower with id: {}", it.getServerId()));
+                .forEach(it -> log.info("Received heartbeat reply from follower with id: {}", it.getServerId()));
     }
 
     @Override
@@ -119,7 +119,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     @SneakyThrows
     private Optional<AppendEntry.Response> sendHeartbeats(AppendEntry appendEntry, String serverLocation) {
-        return clusterClient.sendHeartbeats(serverLocation, appendEntry, AppendEntry.Response.class);
+        return clusterClient.sendHeartbeats(serverLocation, appendEntry);
     }
 
     private String getShouldCandidateForLeaderMessage(boolean candidateForLeader) {

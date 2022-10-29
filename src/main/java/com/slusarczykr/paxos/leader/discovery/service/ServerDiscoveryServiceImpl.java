@@ -22,7 +22,7 @@ public class ServerDiscoveryServiceImpl implements ServerDiscoveryService {
 
     private static final Logger log = LoggerFactory.getLogger(ServerDiscoveryServiceImpl.class);
 
-    private final RestTemplate webClient;
+    private final RestTemplate webClient = new RestTemplate();
     private final ServerDetails serverDetails;
     private final ServerDiscoveryConfiguration serverDiscoveryConfiguration;
 
