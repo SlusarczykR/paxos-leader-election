@@ -23,7 +23,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderElectionServiceImpl.class);
 
-    private final PaxosClient clusterClient;
+    private final PaxosClient paxosClient;
 
     private final ServerDetails serverDetails;
     private final ServerDiscoveryService discoveryService;
@@ -55,7 +55,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     @SneakyThrows
     private Optional<RequestVote.Response> requestCandidates(RequestVote requestVote, String serverLocation) {
-        return clusterClient.requestCandidates(serverLocation, requestVote);
+        return paxosClient.requestCandidates(serverLocation, requestVote);
     }
 
     private <T extends RequestVote.Response> boolean checkAcceptanceMajority(List<T> responseRequestVotes) {
@@ -100,7 +100,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     @Override
     public void sendHeartbeats() {
-        log.info("Start sending heartbeats to followers...");
+        log.info("Sending heartbeats to followers...");
         AppendEntry appendEntry = createHeartbeat();
         discoveryService.getServers().values().stream()
                 .map(serverLocation -> sendHeartbeats(appendEntry, serverLocation))
@@ -119,7 +119,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     @SneakyThrows
     private Optional<AppendEntry.Response> sendHeartbeats(AppendEntry appendEntry, String serverLocation) {
-        return clusterClient.sendHeartbeats(serverLocation, appendEntry);
+        return paxosClient.sendHeartbeats(serverLocation, appendEntry);
     }
 
     private String getShouldCandidateForLeaderMessage(boolean candidateForLeader) {

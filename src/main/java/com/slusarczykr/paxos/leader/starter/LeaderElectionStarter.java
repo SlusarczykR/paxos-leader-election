@@ -15,9 +15,13 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 @Component
 @RequiredArgsConstructor
@@ -32,7 +36,10 @@ public class LeaderElectionStarter {
 
     private final LeaderElectionService leaderElectionService;
 
+    private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+
     private final AtomicReference<CompletableFuture<Boolean>> candidacy = new AtomicReference<>();
+    private final AtomicReference<Future<?>> heartbeats = new AtomicReference<>();
 
     private final Random random = new Random();
 
@@ -56,8 +63,9 @@ public class LeaderElectionStarter {
     }
 
     private void processLeaderElection(boolean leader) {
+        log.info("Processing leader election - leader: {}", leader);
         if (Boolean.TRUE.equals(leader)) {
-            leaderElectionService.sendHeartbeats();
+            heartbeats.set(scheduledExecutor.scheduleAtFixedRate(leaderElectionService::sendHeartbeats, 5, 10, SECONDS));
         } else {
             startLeaderCandidacy();
         }
@@ -75,7 +83,11 @@ public class LeaderElectionStarter {
         factory.autowireBean(task);
     }
 
-    private void cancelIfPresent(CompletableFuture<?> task) {
+    public void stopHeartbeats() {
+        cancelIfPresent(heartbeats.get());
+    }
+
+    private void cancelIfPresent(Future<?> task) {
         Optional.ofNullable(task).ifPresent(it -> it.cancel(false));
     }
 
@@ -83,8 +95,10 @@ public class LeaderElectionStarter {
         return candidacy.get();
     }
 
-    public void cancelLeaderCandidacy() {
+    public void reset() {
+        log.info("Resetting leader candidacy...");
         cancelIfPresent(candidacy.get());
+        startLeaderCandidacy();
     }
 
     private int awaitLeaderElectionTime() {

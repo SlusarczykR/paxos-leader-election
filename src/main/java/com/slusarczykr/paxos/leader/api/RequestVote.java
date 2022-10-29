@@ -15,9 +15,7 @@ public class RequestVote extends AppendEntry implements Serializable {
         super(serverId, term, commitIndex);
     }
 
-    @JsonTypeInfo(
-            use = JsonTypeInfo.Id.NAME,
-            property = "type")
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
     @JsonSubTypes({
             @JsonSubTypes.Type(value = Response.Accepted.class, name = "accepted"),
             @JsonSubTypes.Type(value = Response.Rejected.class, name = "rejected")

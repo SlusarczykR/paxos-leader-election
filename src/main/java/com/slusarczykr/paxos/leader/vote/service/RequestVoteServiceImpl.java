@@ -2,7 +2,6 @@ package com.slusarczykr.paxos.leader.vote.service;
 
 import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
-import com.slusarczykr.paxos.leader.starter.LeaderElectionStarter;
 import com.slusarczykr.paxos.leader.vote.factory.RequestVoteFactory;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -20,13 +19,11 @@ public class RequestVoteServiceImpl implements RequestVoteService {
 
     private final ServerDetails serverDetails;
 
-    private final LeaderElectionStarter leaderElectionStarter;
     private final RequestVoteFactory requestVoteFactory;
 
     @Override
     public RequestVote.Response vote(RequestVote requestVote) {
         log.info("Start voting procedure for leader election of candidate server with id {}...", requestVote.getServerId());
-        leaderElectionStarter.cancelLeaderCandidacy();
         long candidateTerm = requestVote.getTerm();
         boolean accepted = vote(candidateTerm);
         log.info(getServerCandidacyVotingStatusMessage(accepted, requestVote.getServerId()));
