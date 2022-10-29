@@ -1,6 +1,8 @@
 paxos:
   server:
     leader-election:
-      heartbeats_interval: 10
+      min_await_time: 15
+      max_await_time: 25
+      heartbeats_interval: 5
     discovery:
       hosts: http://localhost:8090,http://localhost:8091,http://localhost:8092,http://localhost:8093

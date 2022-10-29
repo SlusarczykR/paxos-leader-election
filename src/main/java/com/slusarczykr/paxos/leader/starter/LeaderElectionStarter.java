@@ -31,12 +31,9 @@ public class LeaderElectionStarter {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderElectionStarter.class);
 
-    public static final int MIN_AWAIT_TIME = 15;
-    public static final int MAX_AWAIT_TIME = 30;
-
     private final ApplicationContext applicationContext;
     private final LeaderElectionService leaderElectionService;
-    private final LeaderElectionProperties leaderElectionProperties;
+    private final LeaderElectionProperties leaderElectionProps;
 
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicReference<CompletableFuture<Boolean>> candidacy = new AtomicReference<>();
@@ -47,7 +44,17 @@ public class LeaderElectionStarter {
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
         log.info("Initializing leader election procedure...");
+
+        if (validateLeaderElectionConfig()) {
+            log.warn("Invalid leader election config. detected! Resetting leader election properties to default values...");
+            leaderElectionProps.reset();
+        }
         startLeaderCandidacy();
+    }
+
+    private boolean validateLeaderElectionConfig() {
+        return leaderElectionProps.getHeartbeatsInterval() >= leaderElectionProps.getMinAwaitTime()
+                || leaderElectionProps.getMinAwaitTime() >= leaderElectionProps.getMaxAwaitTime();
     }
 
     public void startLeaderCandidacy() {
@@ -73,7 +80,7 @@ public class LeaderElectionStarter {
     }
 
     private ScheduledFuture<?> scheduleHeartbeats() {
-        int heartbeatsInterval = leaderElectionProperties.getHeartbeatsInterval();
+        int heartbeatsInterval = leaderElectionProps.getHeartbeatsInterval();
         log.debug("Scheduling heartbeats with interval of {}s", heartbeatsInterval);
 
         return scheduledExecutor.scheduleAtFixedRate(
@@ -115,7 +122,7 @@ public class LeaderElectionStarter {
     }
 
     private int awaitLeaderElectionTime() {
-        return generateRandom(MIN_AWAIT_TIME, MAX_AWAIT_TIME) * 1000;
+        return generateRandom(leaderElectionProps.getMinAwaitTime(), leaderElectionProps.getMaxAwaitTime()) * 1000;
     }
 
     public int generateRandom(int min, int max) {
