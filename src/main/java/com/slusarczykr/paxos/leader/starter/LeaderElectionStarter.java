@@ -1,5 +1,6 @@
 package com.slusarczykr.paxos.leader.starter;
 
+import com.slusarczykr.paxos.leader.election.config.LeaderElectionProperties;
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
 import com.slusarczykr.paxos.leader.election.task.LeaderCandidacy;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -33,11 +35,10 @@ public class LeaderElectionStarter {
     public static final int MAX_AWAIT_TIME = 30;
 
     private final ApplicationContext applicationContext;
-
     private final LeaderElectionService leaderElectionService;
+    private final LeaderElectionProperties leaderElectionProperties;
 
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
-
     private final AtomicReference<CompletableFuture<Boolean>> candidacy = new AtomicReference<>();
     private final AtomicReference<Future<?>> heartbeats = new AtomicReference<>();
 
@@ -57,7 +58,7 @@ public class LeaderElectionStarter {
     }
 
     private CompletableFuture<Boolean> startLeaderCandidacy(LeaderCandidacy task, int timeout) {
-        log.info("Follower will start its candidacy for a leader for {} ms", timeout);
+        log.info("Follower will start leader candidacy for {} ms", timeout);
         Executor delayedExecutor = CompletableFuture.delayedExecutor(timeout, MILLISECONDS);
         return CompletableFuture.supplyAsync(task::start, delayedExecutor);
     }
@@ -65,10 +66,22 @@ public class LeaderElectionStarter {
     private void processLeaderElection(boolean leader) {
         log.info("Processing leader election - leader: {}", leader);
         if (Boolean.TRUE.equals(leader)) {
-            heartbeats.set(scheduledExecutor.scheduleAtFixedRate(leaderElectionService::sendHeartbeats, 5, 10, SECONDS));
+            heartbeats.set(scheduleHeartbeats());
         } else {
             startLeaderCandidacy();
         }
+    }
+
+    private ScheduledFuture<?> scheduleHeartbeats() {
+        int heartbeatsInterval = leaderElectionProperties.getHeartbeatsInterval();
+        log.debug("Scheduling heartbeats with interval of {}s", heartbeatsInterval);
+
+        return scheduledExecutor.scheduleAtFixedRate(
+                leaderElectionService::sendHeartbeats,
+                5,
+                heartbeatsInterval,
+                SECONDS
+        );
     }
 
     private LeaderCandidacy createStartLeaderElectionTask() {
@@ -96,7 +109,7 @@ public class LeaderElectionStarter {
     }
 
     public void reset() {
-        log.info("Resetting leader candidacy...");
+        log.info("Resetting leader candidacy starting timeout...");
         cancelIfPresent(candidacy.get());
         startLeaderCandidacy();
     }
