@@ -4,7 +4,7 @@ import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.api.client.PaxosClient;
 import com.slusarczykr.paxos.leader.discovery.service.ServerDiscoveryService;
-import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
@@ -25,21 +25,21 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     private final PaxosClient paxosClient;
 
-    private final ServerDetails serverDetails;
+    private final PaxosServer paxosServer;
     private final ServerDiscoveryService discoveryService;
 
     @Override
     public RequestVote createElectionVote() {
         return new RequestVote(
-                serverDetails.getIdValue(),
-                serverDetails.getTermValue(),
-                serverDetails.getCommitIndexValue()
+                paxosServer.getIdValue(),
+                paxosServer.getTermValue(),
+                paxosServer.getCommitIndexValue()
         );
     }
 
     @Override
     public boolean candidateForLeader() throws PaxosLeaderElectionException {
-        log.info("Starting the candidacy of the server with id {} for the leader...", serverDetails.getIdValue());
+        log.info("Starting the candidacy of the server with id {} for the leader...", paxosServer.getIdValue());
         RequestVote requestVote = createElectionVote();
         List<RequestVote.Response> responseRequestVotes = sendRequestVoteToCandidates(requestVote);
 
@@ -69,7 +69,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     private String getServerCandidacyVotingStatusMessage(boolean acceptedByMajority) {
         String acceptanceMessage = acceptedByMajority ? "accepted" : "rejected";
         return String.format("Candidacy of the server with id %d has been %s in the current turn!",
-                serverDetails.getIdValue(), acceptanceMessage);
+                paxosServer.getIdValue(), acceptanceMessage);
     }
 
     private <T extends RequestVote.Response> Map<Boolean, List<T>> getCandidatesResponsesByAcceptance(List<T> responseRequestVotes) {
@@ -92,10 +92,14 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     @Override
     public boolean shouldCandidateForLeader() {
-        boolean candidateForLeader = calculateCurrentTermModulo() == serverDetails.getIdValue();
-        log.info(getShouldCandidateForLeaderMessage(candidateForLeader));
+        if (discoveryService.anyServerAvailable()) {
+            boolean candidateForLeader = calculateCurrentTermModulo() == paxosServer.getIdValue();
+            log.info(getShouldCandidateForLeaderMessage(candidateForLeader));
 
-        return candidateForLeader;
+            return candidateForLeader;
+        }
+        log.debug("No servers available...");
+        return true;
     }
 
     @Override
@@ -111,9 +115,9 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     @Override
     public AppendEntry createHeartbeat() {
         return new AppendEntry(
-                serverDetails.getIdValue(),
-                serverDetails.getTermValue(),
-                serverDetails.getCommitIndexValue()
+                paxosServer.getIdValue(),
+                paxosServer.getTermValue(),
+                paxosServer.getCommitIndexValue()
         );
     }
 
@@ -128,7 +132,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     }
 
     private long calculateCurrentTermModulo() {
-        long serverTerm = serverDetails.getTermValue();
+        long serverTerm = paxosServer.getTermValue();
         int numberOfAvailableServers = discoveryService.getNumberOfAvailableServers();
         log.info("Number of available servers: {}, current server term: {}", numberOfAvailableServers, serverTerm);
 

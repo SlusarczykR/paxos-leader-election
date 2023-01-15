@@ -1,5 +1,6 @@
 package com.slusarczykr.paxos.leader.starter;
 
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.election.config.LeaderElectionProperties;
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
 import com.slusarczykr.paxos.leader.election.task.LeaderCandidacy;
@@ -22,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.slusarczykr.paxos.leader.discovery.state.ErrorStatus.Type.INFINITE_REPLIES;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -34,6 +36,7 @@ public class LeaderElectionStarter {
     private final ApplicationContext applicationContext;
     private final LeaderElectionService leaderElectionService;
     private final LeaderElectionProperties leaderElectionProps;
+    private final PaxosServer paxosServer;
 
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicReference<CompletableFuture<Boolean>> candidacy = new AtomicReference<>();
@@ -79,7 +82,8 @@ public class LeaderElectionStarter {
         }
     }
 
-    private ScheduledFuture<?> scheduleHeartbeats() {
+    public ScheduledFuture<?> scheduleHeartbeats() {
+        disableInfiniteRepliesIfEnabled();
         int heartbeatsInterval = leaderElectionProps.getHeartbeatsInterval();
         log.debug("Scheduling heartbeats with interval of {}s", heartbeatsInterval);
 
@@ -89,6 +93,12 @@ public class LeaderElectionStarter {
                 heartbeatsInterval,
                 SECONDS
         );
+    }
+
+    private void disableInfiniteRepliesIfEnabled() {
+        if (paxosServer.isInfiniteRepliesEnabled()) {
+            paxosServer.disableError(INFINITE_REPLIES);
+        }
     }
 
     private LeaderCandidacy createStartLeaderElectionTask() {

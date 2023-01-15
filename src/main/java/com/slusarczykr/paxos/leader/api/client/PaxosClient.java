@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,12 +24,16 @@ public class PaxosClient {
 
     private static final Logger log = LoggerFactory.getLogger(PaxosClient.class);
 
+    private static final String FAKE_URI = "/fake";
+
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final PaxosServer paxosServer;
 
-    public PaxosClient(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public PaxosClient(ObjectMapper objectMapper, PaxosServer paxosServer) {
         this.restTemplate = new RestTemplate();
+        this.objectMapper = objectMapper;
+        this.paxosServer = paxosServer;
     }
 
     public Optional<RequestVote.Response> requestCandidates(String serverLocation, RequestVote requestVote) throws PaxosLeaderElectionException {
@@ -44,13 +49,23 @@ public class PaxosClient {
     private <T> Optional<T> sendRequest(String requestUrl, AppendEntry appendEntry, Class<T> requestVoteResponse)
             throws PaxosLeaderElectionException {
         try {
-            return Optional.ofNullable(restTemplate.postForObject(requestUrl, toRequest(appendEntry), requestVoteResponse));
+            requestUrl = malformUrlIfLostConnectionEnabled(requestUrl);
+            HttpEntity<String> request = toRequest(appendEntry);
+            return Optional.ofNullable(restTemplate.postForObject(requestUrl, request, requestVoteResponse));
         } catch (JsonProcessingException e) {
             throw new PaxosLeaderElectionException("Error while proposing the leader candidacy!");
         } catch (Exception e) {
             log.error("Server listening on address {} is not reachable!", requestUrl, e);
         }
         return Optional.empty();
+    }
+
+    private String malformUrlIfLostConnectionEnabled(String requestUrl) {
+        if (paxosServer.isLostConnectionEnabled()) {
+            log.debug("Malforming request url: '{}'", requestUrl);
+            return requestUrl + FAKE_URI;
+        }
+        return requestUrl;
     }
 
     private HttpEntity<String> toRequest(AppendEntry appendEntry) throws JsonProcessingException {

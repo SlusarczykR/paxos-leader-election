@@ -1,6 +1,6 @@
 package com.slusarczykr.paxos.leader.election.task;
 
-import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import org.slf4j.Logger;
@@ -14,12 +14,12 @@ public class LeaderCandidacy {
     private static final Logger log = LoggerFactory.getLogger(LeaderCandidacy.class);
 
     @Autowired
-    private ServerDetails serverDetails;
+    private PaxosServer paxosServer;
 
     @Autowired
     private LeaderElectionService leaderElectionService;
 
-    public Boolean start() {
+    public boolean start() {
         try {
             return startLeaderCandidacy();
         } catch (PaxosLeaderElectionException e) {
@@ -29,7 +29,7 @@ public class LeaderCandidacy {
     }
 
     private boolean startLeaderCandidacy() throws PaxosLeaderElectionException {
-        serverDetails.incrementTerm();
+        paxosServer.incrementTerm();
 
         if (leaderElectionService.shouldCandidateForLeader()) {
             return candidateForLeader();
@@ -39,11 +39,11 @@ public class LeaderCandidacy {
 
     private boolean candidateForLeader() throws PaxosLeaderElectionException {
         boolean leader = leaderElectionService.candidateForLeader();
-        serverDetails.setLeader(leader);
+        paxosServer.setLeader(leader);
 
         if (leader) {
             log.info("Server with id {} has been accepted by the majority and elected as the leader for the current turn!",
-                    serverDetails.getIdValue());
+                    paxosServer.getIdValue());
         }
         return leader;
     }
