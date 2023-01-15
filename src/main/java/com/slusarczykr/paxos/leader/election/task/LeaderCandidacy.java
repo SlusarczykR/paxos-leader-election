@@ -29,8 +29,9 @@ public class LeaderCandidacy {
     }
 
     private boolean startLeaderCandidacy() throws PaxosLeaderElectionException {
+        serverDetails.incrementTerm();
+
         if (leaderElectionService.shouldCandidateForLeader()) {
-            serverDetails.incrementTerm();
             return candidateForLeader();
         }
         return false;

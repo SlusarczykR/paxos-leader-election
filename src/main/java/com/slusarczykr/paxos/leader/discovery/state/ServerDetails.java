@@ -39,15 +39,24 @@ public class ServerDetails {
     }
 
     private void initServerDetails() {
+        initServerId();
+        incrementTerm();
+    }
+
+    private void initServerId() {
         int serverId = calculateServerId(serverPort);
         id.set(serverId);
-        incrementTerm();
+        log.info("Id {} has been assigned to the server", serverId);
     }
 
     public void incrementTerm() {
         long nextTerm = calculateNextTerm();
         log.info("New term: {}", nextTerm);
-        term.set(nextTerm);
+        updateTerm(nextTerm);
+    }
+
+    public void updateTerm(long term) {
+        this.term.set(term);
     }
 
     private long calculateNextTerm() {

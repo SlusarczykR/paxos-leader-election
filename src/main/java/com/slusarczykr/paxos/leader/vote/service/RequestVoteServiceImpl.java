@@ -50,7 +50,7 @@ public class RequestVoteServiceImpl implements RequestVoteService {
     }
 
     private void setCurrentTerm(long term) {
-        serverDetails.getTerm().set(term);
+        serverDetails.updateTerm(term);
     }
 
     private boolean voteForCandidate(long candidateTerm) {
