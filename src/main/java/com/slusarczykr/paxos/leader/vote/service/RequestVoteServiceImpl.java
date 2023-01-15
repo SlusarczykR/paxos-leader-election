@@ -1,15 +1,15 @@
 package com.slusarczykr.paxos.leader.vote.service;
 
+import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
-import com.slusarczykr.paxos.leader.model.RequestVote;
 import com.slusarczykr.paxos.leader.vote.factory.RequestVoteFactory;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import static com.slusarczykr.paxos.leader.model.RequestVote.Response.Status.ACCEPTED;
-import static com.slusarczykr.paxos.leader.model.RequestVote.Response.Status.REJECTED;
+import static com.slusarczykr.paxos.leader.api.RequestVote.Response.Status.ACCEPTED;
+import static com.slusarczykr.paxos.leader.api.RequestVote.Response.Status.REJECTED;
 
 @Service
 @RequiredArgsConstructor
@@ -18,12 +18,12 @@ public class RequestVoteServiceImpl implements RequestVoteService {
     private static final Logger log = LoggerFactory.getLogger(RequestVoteServiceImpl.class);
 
     private final ServerDetails serverDetails;
+
     private final RequestVoteFactory requestVoteFactory;
 
     @Override
     public RequestVote.Response vote(RequestVote requestVote) {
         log.info("Start voting procedure for leader election of candidate server with id {}...", requestVote.getServerId());
-        serverDetails.getCandidateForLeaderTimer().cancel();
         long candidateTerm = requestVote.getTerm();
         boolean accepted = vote(candidateTerm);
         log.info(getServerCandidacyVotingStatusMessage(accepted, requestVote.getServerId()));
@@ -50,7 +50,7 @@ public class RequestVoteServiceImpl implements RequestVoteService {
     }
 
     private void setCurrentTerm(long term) {
-        serverDetails.getTerm().set(term);
+        serverDetails.updateTerm(term);
     }
 
     private boolean voteForCandidate(long candidateTerm) {

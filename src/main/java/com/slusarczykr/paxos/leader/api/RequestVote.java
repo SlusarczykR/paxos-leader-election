@@ -1,5 +1,7 @@
-package com.slusarczykr.paxos.leader.model;
+package com.slusarczykr.paxos.leader.api;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -7,13 +9,17 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
-@Data
-public class RequestVote implements Serializable {
+public class RequestVote extends AppendEntry implements Serializable {
 
-    private final long serverId;
-    private final long term;
-    private final long commitIndex;
+    public RequestVote(long serverId, long term, long commitIndex) {
+        super(serverId, term, commitIndex);
+    }
 
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+    @JsonSubTypes({
+            @JsonSubTypes.Type(value = Response.Accepted.class, name = "accepted"),
+            @JsonSubTypes.Type(value = Response.Rejected.class, name = "rejected")
+    })
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -27,6 +33,7 @@ public class RequestVote implements Serializable {
         private long serverId;
 
         @Data
+        @NoArgsConstructor
         @EqualsAndHashCode(callSuper = true)
         public static class Accepted extends Response {
 
@@ -36,6 +43,7 @@ public class RequestVote implements Serializable {
         }
 
         @Data
+        @NoArgsConstructor
         @EqualsAndHashCode(callSuper = true)
         public static class Rejected extends Response {
 

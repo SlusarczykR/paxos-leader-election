@@ -1,19 +1,16 @@
 package com.slusarczykr.paxos.leader.election.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slusarczykr.paxos.leader.model.RequestVote;
+import com.slusarczykr.paxos.leader.api.AppendEntry;
+import com.slusarczykr.paxos.leader.api.RequestVote;
+import com.slusarczykr.paxos.leader.api.client.PaxosClient;
 import com.slusarczykr.paxos.leader.discovery.service.ServerDiscoveryService;
 import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -26,8 +23,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderElectionServiceImpl.class);
 
-    private final RestTemplate webClient;
-    private final ObjectMapper objectMapper;
+    private final PaxosClient paxosClient;
 
     private final ServerDetails serverDetails;
     private final ServerDiscoveryService discoveryService;
@@ -43,31 +39,23 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
 
     @Override
     public boolean candidateForLeader() throws PaxosLeaderElectionException {
-        try {
-            log.info("Starting the candidacy of the server with id {} for the leader...", serverDetails.getIdValue());
-            HttpEntity<String> requestVote = prepareElectionRequestVote();
-            List<RequestVote.Response> responseRequestVotes = sendRequestVoteToCandidates(requestVote);
+        log.info("Starting the candidacy of the server with id {} for the leader...", serverDetails.getIdValue());
+        RequestVote requestVote = createElectionVote();
+        List<RequestVote.Response> responseRequestVotes = sendRequestVoteToCandidates(requestVote);
 
-            return checkAcceptanceMajority(responseRequestVotes);
-        } catch (JsonProcessingException e) {
-            throw new PaxosLeaderElectionException("Error while proposing the leader!");
-        }
+        return checkAcceptanceMajority(responseRequestVotes);
     }
 
-    private HttpEntity<String> prepareElectionRequestVote() throws JsonProcessingException {
-        RequestVote electionVote = createElectionVote();
-        return new HttpEntity<>(toJSON(electionVote), prepareHeaders());
-    }
-
-    private List<RequestVote.Response> sendRequestVoteToCandidates(HttpEntity<String> requestVote) {
+    private List<RequestVote.Response> sendRequestVoteToCandidates(RequestVote requestVote) {
         return discoveryService.getServers().values().stream()
-                .map(serverLocation -> requestCandidates(serverLocation, requestVote, RequestVote.Response.class))
+                .map(serverLocation -> requestCandidates(requestVote, serverLocation))
                 .flatMap(Optional::stream)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private String buildServerLeaderCandidacyVoteUrl(String serverLocation) {
-        return serverLocation + "/leaderElection/vote";
+    @SneakyThrows
+    private Optional<RequestVote.Response> requestCandidates(RequestVote requestVote, String serverLocation) {
+        return paxosClient.requestCandidates(serverLocation, requestVote);
     }
 
     private <T extends RequestVote.Response> boolean checkAcceptanceMajority(List<T> responseRequestVotes) {
@@ -102,34 +90,36 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
         return countRejectedRequestVotes(promisesByAcceptance, true) + candidateRequestVote;
     }
 
-    private String toJSON(RequestVote requestVote) throws JsonProcessingException {
-        return objectMapper.writeValueAsString(requestVote);
-    }
-
-    private HttpHeaders prepareHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        return headers;
-    }
-
-    private <T extends RequestVote.Response> Optional<T> requestCandidates(String serverLocation, HttpEntity<String> request,
-                                                                           Class<T> requestVoteResponse) {
-        try {
-            String requestUrl = buildServerLeaderCandidacyVoteUrl(serverLocation);
-            return Optional.ofNullable(webClient.postForObject(requestUrl, request, requestVoteResponse));
-        } catch (Exception e) {
-            log.warn("Server listening on address {} is not reachable!", serverLocation);
-        }
-        return Optional.empty();
-    }
-
     @Override
-    public boolean shouldCandidateForLeader() throws PaxosLeaderElectionException {
+    public boolean shouldCandidateForLeader() {
         boolean candidateForLeader = calculateCurrentTermModulo() == serverDetails.getIdValue();
         log.info(getShouldCandidateForLeaderMessage(candidateForLeader));
 
         return candidateForLeader;
+    }
+
+    @Override
+    public void sendHeartbeats() {
+        log.info("Sending heartbeats to followers...");
+        AppendEntry appendEntry = createHeartbeat();
+        discoveryService.getServers().values().stream()
+                .map(serverLocation -> sendHeartbeats(appendEntry, serverLocation))
+                .flatMap(Optional::stream)
+                .forEach(it -> log.info("Received heartbeat reply from follower with id: {}", it.getServerId()));
+    }
+
+    @Override
+    public AppendEntry createHeartbeat() {
+        return new AppendEntry(
+                serverDetails.getIdValue(),
+                serverDetails.getTermValue(),
+                serverDetails.getCommitIndexValue()
+        );
+    }
+
+    @SneakyThrows
+    private Optional<AppendEntry.Response> sendHeartbeats(AppendEntry appendEntry, String serverLocation) {
+        return paxosClient.sendHeartbeats(serverLocation, appendEntry);
     }
 
     private String getShouldCandidateForLeaderMessage(boolean candidateForLeader) {
