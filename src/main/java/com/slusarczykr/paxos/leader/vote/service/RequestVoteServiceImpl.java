@@ -41,6 +41,7 @@ public class RequestVoteServiceImpl implements RequestVoteService {
     }
 
     private boolean vote(long candidateTerm) {
+        paxosServer.demoteLeader();
         boolean accepted = voteForCandidate(candidateTerm);
 
         if (accepted) {

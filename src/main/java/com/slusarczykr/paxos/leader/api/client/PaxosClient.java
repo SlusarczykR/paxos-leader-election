@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
+import com.slusarczykr.paxos.leader.exception.PaxosLeaderConflictException;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,8 +56,10 @@ public class PaxosClient {
             requestUrl = malformUrlIfLostConnectionEnabled(requestUrl);
             HttpEntity<String> request = toRequest(appendEntry);
             return Optional.ofNullable(restTemplate.postForObject(requestUrl, request, requestVoteResponse));
-        } catch (IllegalStateException | JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             throw new PaxosLeaderElectionException("Error occurred on request processing!");
+        } catch (PaxosLeaderConflictException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Server listening on address {} is not reachable!", requestUrl, e);
         }

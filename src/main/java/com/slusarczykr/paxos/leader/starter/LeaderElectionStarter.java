@@ -4,6 +4,7 @@ import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.election.config.LeaderElectionProperties;
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
 import com.slusarczykr.paxos.leader.election.task.LeaderCandidacy;
+import com.slusarczykr.paxos.leader.exception.PaxosLeaderConflictException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +62,7 @@ public class LeaderElectionStarter {
     }
 
     public void startLeaderCandidacy() {
+        paxosServer.demoteLeader();
         LeaderCandidacy task = createStartLeaderElectionTask();
         CompletableFuture<Boolean> leaderCandidacy = startLeaderCandidacy(task, awaitLeaderElectionTime());
         leaderCandidacy.thenAccept(this::processLeaderElection);
@@ -106,8 +108,10 @@ public class LeaderElectionStarter {
 
     private void sendHeartbeats() {
         leaderElectionService.sendHeartbeats(e -> {
-            log.error("Leader conflict detected while sending heartbeats to followers nodes!");
-            stopHeartbeats();
+            if (e instanceof PaxosLeaderConflictException) {
+                log.error("Leader conflict detected while sending heartbeats to followers nodes!");
+                stopHeartbeats();
+            }
         });
     }
 

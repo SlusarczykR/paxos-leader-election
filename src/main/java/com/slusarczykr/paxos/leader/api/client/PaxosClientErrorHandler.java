@@ -1,5 +1,6 @@
 package com.slusarczykr.paxos.leader.api.client;
 
+import com.slusarczykr.paxos.leader.exception.PaxosLeaderConflictException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
@@ -11,8 +12,7 @@ import static org.springframework.http.HttpStatus.Series.CLIENT_ERROR;
 import static org.springframework.http.HttpStatus.Series.SERVER_ERROR;
 
 @Component
-public class PaxosClientErrorHandler
-        implements ResponseErrorHandler {
+public class PaxosClientErrorHandler implements ResponseErrorHandler {
 
     @Override
     public boolean hasError(ClientHttpResponse httpResponse)
@@ -28,7 +28,7 @@ public class PaxosClientErrorHandler
 
         if (isClientOrServerError(statusCodeSeries)) {
             String errorMessage = String.format("Error with status %s occurred during request", statusCodeSeries.name());
-            throw new IllegalStateException(errorMessage);
+            throw new PaxosLeaderConflictException(errorMessage);
         }
     }
 

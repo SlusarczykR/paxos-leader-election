@@ -99,6 +99,10 @@ public class PaxosServer {
         return getLeader().get();
     }
 
+    public void demoteLeader() {
+        setLeader(false);
+    }
+
     public void setLeader(boolean leader) {
         getLeader().set(leader);
     }

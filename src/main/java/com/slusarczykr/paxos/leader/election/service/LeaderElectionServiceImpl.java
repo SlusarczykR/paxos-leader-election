@@ -129,7 +129,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
                     .flatMap(Optional::stream)
                     .forEach(it -> log.info("Received heartbeat reply from follower with id: {}", it.getServerId()));
         } catch (Exception e) {
-            log.error("");
+            log.error("Error occurred while sending heartbeats to followers!");
             errorHandler.accept(e);
         }
     }
