@@ -27,10 +27,8 @@ public class LeaderElectionResource {
     private static final Logger log = LoggerFactory.getLogger(LeaderElectionResource.class);
 
     private final LeaderElectionService leaderElectionService;
-
     private final LeaderElectionStarter leaderElectionStarter;
     private final RequestVoteService requestVoteService;
-
     private final PaxosServer paxosServer;
 
     @PostMapping("/candidate")
@@ -44,10 +42,9 @@ public class LeaderElectionResource {
     }
 
     private ResponseEntity<Void> startLeaderCandidacy() throws PaxosLeaderElectionException {
-        paxosServer.incrementTerm();
+        boolean leader = leaderElectionService.startLeaderCandidacy();
 
-        if (leaderElectionService.shouldCandidateForLeader()) {
-            leaderElectionService.candidateForLeader();
+        if (leader) {
             return new ResponseEntity<>(HttpStatus.CREATED);
         }
         return new ResponseEntity<>(HttpStatus.OK);
@@ -56,13 +53,9 @@ public class LeaderElectionResource {
     @PostMapping("/vote")
     public ResponseEntity<RequestVote.Response> voteForLeaderCandidate(@RequestBody RequestVote requestVote) {
         log.info("Received vote from server with id: {}", requestVote.getServerId());
-        leaderElectionStarter.reset();
-
-        if (paxosServer.isLeader()) {
-            log.info("Stopping sending heartbeats...");
-            leaderElectionStarter.stopHeartbeats();
-        }
+        stopHeartbeatsOrReset();
         RequestVote.Response requestVoteResponse = requestVoteService.vote(requestVote);
+
         return new ResponseEntity<>(requestVoteResponse, HttpStatus.OK);
     }
 
@@ -70,7 +63,23 @@ public class LeaderElectionResource {
     public ResponseEntity<AppendEntry.Response> sendHeartbeat(@RequestBody AppendEntry appendEntry) {
         log.info("Received heartbeat from leader with id: {}", appendEntry.getServerId());
         AppendEntry.Response appendEntryResponse = new AppendEntry.Response(paxosServer.getIdValue());
-        leaderElectionStarter.reset();
+
+        if (stopHeartbeatsOrReset()) {
+            log.error("Heartbeat message received while the current server is already the leader!");
+            return new ResponseEntity<>(appendEntryResponse, HttpStatus.CONFLICT);
+        }
         return new ResponseEntity<>(appendEntryResponse, HttpStatus.OK);
+    }
+
+    private boolean stopHeartbeatsOrReset() {
+        boolean leader = paxosServer.isLeader();
+
+        if (leader) {
+            log.info("Stopping sending heartbeats...");
+            leaderElectionStarter.stopHeartbeats();
+        } else {
+            leaderElectionStarter.reset();
+        }
+        return leader;
     }
 }

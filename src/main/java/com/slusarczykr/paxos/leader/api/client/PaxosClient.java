@@ -8,6 +8,7 @@ import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,8 +31,10 @@ public class PaxosClient {
     private final ObjectMapper objectMapper;
     private final PaxosServer paxosServer;
 
-    public PaxosClient(ObjectMapper objectMapper, PaxosServer paxosServer) {
-        this.restTemplate = new RestTemplate();
+    public PaxosClient(RestTemplateBuilder restTemplateBuilder, ObjectMapper objectMapper, PaxosServer paxosServer) {
+        this.restTemplate = restTemplateBuilder
+                .errorHandler(new PaxosClientErrorHandler())
+                .build();
         this.objectMapper = objectMapper;
         this.paxosServer = paxosServer;
     }
@@ -52,8 +55,8 @@ public class PaxosClient {
             requestUrl = malformUrlIfLostConnectionEnabled(requestUrl);
             HttpEntity<String> request = toRequest(appendEntry);
             return Optional.ofNullable(restTemplate.postForObject(requestUrl, request, requestVoteResponse));
-        } catch (JsonProcessingException e) {
-            throw new PaxosLeaderElectionException("Error while proposing the leader candidacy!");
+        } catch (IllegalStateException | JsonProcessingException e) {
+            throw new PaxosLeaderElectionException("Error occurred on request processing!");
         } catch (Exception e) {
             log.error("Server listening on address {} is not reachable!", requestUrl, e);
         }

@@ -5,16 +5,18 @@ import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.api.client.PaxosClient;
 import com.slusarczykr.paxos.leader.discovery.service.ServerDiscoveryService;
 import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
-import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,16 +40,31 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     }
 
     @Override
-    public boolean candidateForLeader() throws PaxosLeaderElectionException {
+    public boolean startLeaderCandidacy() {
+        paxosServer.incrementTerm();
+
+        if (shouldCandidateForLeader()) {
+            return candidateForLeader();
+        }
+        return false;
+    }
+
+    private boolean candidateForLeader() {
         log.info("Starting the candidacy of the server with id {} for the leader...", paxosServer.getIdValue());
         RequestVote requestVote = createElectionVote();
         List<RequestVote.Response> responseRequestVotes = sendRequestVoteToCandidates(requestVote);
+        boolean accepted = checkAcceptanceMajority(responseRequestVotes);
+        paxosServer.setLeader(accepted);
 
-        return checkAcceptanceMajority(responseRequestVotes);
+        if (accepted) {
+            log.info("Server with id {} has been accepted by the majority and elected as the leader for the current turn!",
+                    paxosServer.getIdValue());
+        }
+        return accepted;
     }
 
     private List<RequestVote.Response> sendRequestVoteToCandidates(RequestVote requestVote) {
-        return discoveryService.getServers().values().stream()
+        return getServerAddresses().stream()
                 .map(serverLocation -> requestCandidates(requestVote, serverLocation))
                 .flatMap(Optional::stream)
                 .toList();
@@ -103,13 +120,22 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     }
 
     @Override
-    public void sendHeartbeats() {
-        log.info("Sending heartbeats to followers...");
-        AppendEntry appendEntry = createHeartbeat();
-        discoveryService.getServers().values().stream()
-                .map(serverLocation -> sendHeartbeats(appendEntry, serverLocation))
-                .flatMap(Optional::stream)
-                .forEach(it -> log.info("Received heartbeat reply from follower with id: {}", it.getServerId()));
+    public void sendHeartbeats(Consumer<Exception> errorHandler) {
+        try {
+            log.info("Sending heartbeats to followers...");
+            AppendEntry appendEntry = createHeartbeat();
+            getServerAddresses().stream()
+                    .map(serverLocation -> sendHeartbeats(appendEntry, serverLocation))
+                    .flatMap(Optional::stream)
+                    .forEach(it -> log.info("Received heartbeat reply from follower with id: {}", it.getServerId()));
+        } catch (Exception e) {
+            log.error("");
+            errorHandler.accept(e);
+        }
+    }
+
+    private Set<String> getServerAddresses() {
+        return new HashSet<>(discoveryService.getServers().values());
     }
 
     @Override

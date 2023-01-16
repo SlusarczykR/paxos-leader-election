@@ -76,21 +76,24 @@ public class LeaderElectionStarter {
     private void processLeaderElection(boolean leader) {
         log.info("Processing leader election - leader: {}", leader);
         if (Boolean.TRUE.equals(leader)) {
-            heartbeats.set(scheduleHeartbeats());
+            disableInfiniteRepliesIfEnabled();
+            scheduleHeartbeats();
         } else {
             startLeaderCandidacy();
         }
     }
 
-    public ScheduledFuture<?> scheduleHeartbeats() {
-        disableInfiniteRepliesIfEnabled();
+    public void scheduleHeartbeats() {
         int heartbeatsInterval = leaderElectionProps.getHeartbeatsInterval();
         log.debug("Scheduling heartbeats with interval of {}s", heartbeatsInterval);
+        heartbeats.set(scheduleHeartbeats(heartbeatsInterval));
+    }
 
+    private ScheduledFuture<?> scheduleHeartbeats(int interval) {
         return scheduledExecutor.scheduleAtFixedRate(
-                leaderElectionService::sendHeartbeats,
+                this::sendHeartbeats,
                 5,
-                heartbeatsInterval,
+                interval,
                 SECONDS
         );
     }
@@ -99,6 +102,13 @@ public class LeaderElectionStarter {
         if (paxosServer.isInfiniteRepliesEnabled()) {
             paxosServer.disableError(INFINITE_REPLIES);
         }
+    }
+
+    private void sendHeartbeats() {
+        leaderElectionService.sendHeartbeats(e -> {
+            log.error("Leader conflict detected while sending heartbeats to followers nodes!");
+            stopHeartbeats();
+        });
     }
 
     private LeaderCandidacy createStartLeaderElectionTask() {
@@ -118,7 +128,10 @@ public class LeaderElectionStarter {
     }
 
     private void cancelIfPresent(Future<?> task) {
-        Optional.ofNullable(task).ifPresent(it -> it.cancel(false));
+        Optional.ofNullable(task).ifPresent(it -> {
+            log.debug("Canceling current task execution");
+            it.cancel(false);
+        });
     }
 
     public CompletableFuture<Boolean> getLeaderCandidacy() {

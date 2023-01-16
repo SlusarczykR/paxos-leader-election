@@ -6,3 +6,7 @@ paxos:
       heartbeats_interval: 5
     discovery:
       hosts: http://localhost:8090,http://localhost:8091,http://localhost:8092,http://localhost:8093
+
+logging:
+  level:
+    com.slusarczykr.paxos.leader: DEBUG
