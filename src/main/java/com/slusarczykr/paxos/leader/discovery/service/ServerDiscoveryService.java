@@ -10,5 +10,7 @@ public interface ServerDiscoveryService {
 
     int getNumberOfAvailableServers();
 
+    boolean anyServerAvailable();
+
     String getServerLocation(int id);
 }

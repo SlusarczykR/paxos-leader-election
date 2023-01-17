@@ -1,7 +1,7 @@
 package com.slusarczykr.paxos.leader.vote.service;
 
 import com.slusarczykr.paxos.leader.api.RequestVote;
-import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.vote.factory.RequestVoteFactory;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -17,7 +17,7 @@ public class RequestVoteServiceImpl implements RequestVoteService {
 
     private static final Logger log = LoggerFactory.getLogger(RequestVoteServiceImpl.class);
 
-    private final ServerDetails serverDetails;
+    private final PaxosServer paxosServer;
 
     private final RequestVoteFactory requestVoteFactory;
 
@@ -41,6 +41,7 @@ public class RequestVoteServiceImpl implements RequestVoteService {
     }
 
     private boolean vote(long candidateTerm) {
+        paxosServer.demoteLeader();
         boolean accepted = voteForCandidate(candidateTerm);
 
         if (accepted) {
@@ -50,13 +51,22 @@ public class RequestVoteServiceImpl implements RequestVoteService {
     }
 
     private void setCurrentTerm(long term) {
-        serverDetails.updateTerm(term);
+        paxosServer.updateTerm(term);
     }
 
     private boolean voteForCandidate(long candidateTerm) {
-        long currentTerm = serverDetails.getTermValue();
+        long currentTerm = paxosServer.getTermValue();
         log.info("Current term: {}, candidate term: {}", currentTerm, candidateTerm);
+        boolean accepted = candidateTerm > currentTerm;
 
-        return candidateTerm > currentTerm;
+        return falsifyVoteIfInvalidResponseEnabled(accepted);
+    }
+
+    private boolean falsifyVoteIfInvalidResponseEnabled(boolean accepted) {
+        if (paxosServer.isInvalidResponseEnabled()) {
+            log.debug(String.format("Falsifying casted %s vote for candidate", accepted ? "accepted" : "rejected"));
+            return !accepted;
+        }
+        return accepted;
     }
 }

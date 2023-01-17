@@ -2,7 +2,7 @@ package com.slusarczykr.paxos.leader.election.resource;
 
 import com.slusarczykr.paxos.leader.api.AppendEntry;
 import com.slusarczykr.paxos.leader.api.RequestVote;
-import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
 import com.slusarczykr.paxos.leader.starter.LeaderElectionStarter;
@@ -20,20 +20,18 @@ import org.springframework.web.bind.annotation.RestController;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
 @RestController
-@RequestMapping("leaderElection")
+@RequestMapping(path = "leaderElection", consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
 @RequiredArgsConstructor
 public class LeaderElectionResource {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderElectionResource.class);
 
     private final LeaderElectionService leaderElectionService;
-
     private final LeaderElectionStarter leaderElectionStarter;
     private final RequestVoteService requestVoteService;
+    private final PaxosServer paxosServer;
 
-    private final ServerDetails serverDetails;
-
-    @PostMapping(value = "/candidate", produces = APPLICATION_JSON_VALUE)
+    @PostMapping("/candidate")
     public ResponseEntity<Void> candidateForLeader() {
         try {
             return startLeaderCandidacy();
@@ -44,31 +42,44 @@ public class LeaderElectionResource {
     }
 
     private ResponseEntity<Void> startLeaderCandidacy() throws PaxosLeaderElectionException {
-        if (leaderElectionService.shouldCandidateForLeader()) {
-            leaderElectionService.candidateForLeader();
+        boolean leader = leaderElectionService.startLeaderCandidacy();
+
+        if (leader) {
             return new ResponseEntity<>(HttpStatus.CREATED);
         }
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
-    @PostMapping(value = "/vote", consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
+    @PostMapping("/vote")
     public ResponseEntity<RequestVote.Response> voteForLeaderCandidate(@RequestBody RequestVote requestVote) {
         log.info("Received vote from server with id: {}", requestVote.getServerId());
-        leaderElectionStarter.reset();
-
-        if (serverDetails.isLeader()) {
-            log.info("Stopping sending heartbeats...");
-            leaderElectionStarter.stopHeartbeats();
-        }
+        stopHeartbeatsOrReset();
         RequestVote.Response requestVoteResponse = requestVoteService.vote(requestVote);
+
         return new ResponseEntity<>(requestVoteResponse, HttpStatus.OK);
     }
 
-    @PostMapping(value = "/heartbeat", consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
+    @PostMapping("/heartbeat")
     public ResponseEntity<AppendEntry.Response> sendHeartbeat(@RequestBody AppendEntry appendEntry) {
         log.info("Received heartbeat from leader with id: {}", appendEntry.getServerId());
-        AppendEntry.Response appendEntryResponse = new AppendEntry.Response(serverDetails.getIdValue());
-        leaderElectionStarter.reset();
+        AppendEntry.Response appendEntryResponse = new AppendEntry.Response(paxosServer.getIdValue());
+
+        if (stopHeartbeatsOrReset()) {
+            log.error("Heartbeat message received while the current server is already the leader!");
+            return new ResponseEntity<>(appendEntryResponse, HttpStatus.CONFLICT);
+        }
         return new ResponseEntity<>(appendEntryResponse, HttpStatus.OK);
+    }
+
+    private boolean stopHeartbeatsOrReset() {
+        boolean leader = paxosServer.isLeader();
+
+        if (leader) {
+            log.info("Stopping sending heartbeats...");
+            leaderElectionStarter.stopHeartbeats();
+        } else {
+            leaderElectionStarter.reset();
+        }
+        return leader;
     }
 }

@@ -1,7 +1,7 @@
 package com.slusarczykr.paxos.leader.discovery.service;
 
 import com.slusarczykr.paxos.leader.discovery.config.ServerDiscoveryConfiguration;
-import com.slusarczykr.paxos.leader.discovery.state.ServerDetails;
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +23,7 @@ public class ServerDiscoveryServiceImpl implements ServerDiscoveryService {
     private static final Logger log = LoggerFactory.getLogger(ServerDiscoveryServiceImpl.class);
 
     private final RestTemplate webClient = new RestTemplate();
-    private final ServerDetails serverDetails;
+    private final PaxosServer paxosServer;
     private final ServerDiscoveryConfiguration serverDiscoveryConfiguration;
 
     private final Map<Integer, String> paxosServers = new ConcurrentHashMap<>();
@@ -41,7 +41,7 @@ public class ServerDiscoveryServiceImpl implements ServerDiscoveryService {
 
     private void registerPaxosServers(ServerDiscoveryConfiguration configuration) {
         configuration.getHosts().forEach(server ->
-                paxosServers.put(serverDetails.calculateServerId(extractPort(server)), server)
+                paxosServers.put(paxosServer.calculateServerId(extractPort(server)), server)
         );
     }
 
@@ -76,6 +76,11 @@ public class ServerDiscoveryServiceImpl implements ServerDiscoveryService {
         return countAvailableServers() + 1;
     }
 
+    @Override
+    public boolean anyServerAvailable() {
+        return countAvailableServers() > 0;
+    }
+
     private int countAvailableServers() {
         return (int) paxosServers.entrySet().stream()
                 .filter(Predicate.not(this::isCurrentHost))
@@ -84,7 +89,7 @@ public class ServerDiscoveryServiceImpl implements ServerDiscoveryService {
     }
 
     private boolean isCurrentHost(Map.Entry<Integer, String> serverEntry) {
-        return serverEntry.getKey() == serverDetails.getIdValue();
+        return serverEntry.getKey() == paxosServer.getIdValue();
     }
 
     @Override

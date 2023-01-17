@@ -1,8 +1,10 @@
 package com.slusarczykr.paxos.leader.starter;
 
+import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.election.config.LeaderElectionProperties;
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
 import com.slusarczykr.paxos.leader.election.task.LeaderCandidacy;
+import com.slusarczykr.paxos.leader.exception.PaxosLeaderConflictException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.slusarczykr.paxos.leader.discovery.state.ErrorStatus.Type.INFINITE_REPLIES;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -34,6 +37,7 @@ public class LeaderElectionStarter {
     private final ApplicationContext applicationContext;
     private final LeaderElectionService leaderElectionService;
     private final LeaderElectionProperties leaderElectionProps;
+    private final PaxosServer paxosServer;
 
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private final AtomicReference<CompletableFuture<Boolean>> candidacy = new AtomicReference<>();
@@ -58,6 +62,7 @@ public class LeaderElectionStarter {
     }
 
     public void startLeaderCandidacy() {
+        paxosServer.demoteLeader();
         LeaderCandidacy task = createStartLeaderElectionTask();
         CompletableFuture<Boolean> leaderCandidacy = startLeaderCandidacy(task, awaitLeaderElectionTime());
         leaderCandidacy.thenAccept(this::processLeaderElection);
@@ -73,22 +78,41 @@ public class LeaderElectionStarter {
     private void processLeaderElection(boolean leader) {
         log.info("Processing leader election - leader: {}", leader);
         if (Boolean.TRUE.equals(leader)) {
-            heartbeats.set(scheduleHeartbeats());
+            disableInfiniteRepliesIfEnabled();
+            scheduleHeartbeats();
         } else {
             startLeaderCandidacy();
         }
     }
 
-    private ScheduledFuture<?> scheduleHeartbeats() {
+    public void scheduleHeartbeats() {
         int heartbeatsInterval = leaderElectionProps.getHeartbeatsInterval();
         log.debug("Scheduling heartbeats with interval of {}s", heartbeatsInterval);
+        heartbeats.set(scheduleHeartbeats(heartbeatsInterval));
+    }
 
+    private ScheduledFuture<?> scheduleHeartbeats(int interval) {
         return scheduledExecutor.scheduleAtFixedRate(
-                leaderElectionService::sendHeartbeats,
+                this::sendHeartbeats,
                 5,
-                heartbeatsInterval,
+                interval,
                 SECONDS
         );
+    }
+
+    private void disableInfiniteRepliesIfEnabled() {
+        if (paxosServer.isInfiniteRepliesEnabled()) {
+            paxosServer.disableError(INFINITE_REPLIES);
+        }
+    }
+
+    private void sendHeartbeats() {
+        leaderElectionService.sendHeartbeats(e -> {
+            if (e instanceof PaxosLeaderConflictException) {
+                log.error("Leader conflict detected while sending heartbeats to followers nodes!");
+                stopHeartbeats();
+            }
+        });
     }
 
     private LeaderCandidacy createStartLeaderElectionTask() {
@@ -108,7 +132,10 @@ public class LeaderElectionStarter {
     }
 
     private void cancelIfPresent(Future<?> task) {
-        Optional.ofNullable(task).ifPresent(it -> it.cancel(false));
+        Optional.ofNullable(task).ifPresent(it -> {
+            log.debug("Canceling current task execution");
+            it.cancel(false);
+        });
     }
 
     public CompletableFuture<Boolean> getLeaderCandidacy() {

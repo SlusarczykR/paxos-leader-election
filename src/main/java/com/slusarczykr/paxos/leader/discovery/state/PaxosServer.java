@@ -12,11 +12,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.slusarczykr.paxos.leader.discovery.state.ErrorStatus.Type.INFINITE_REPLIES;
+import static com.slusarczykr.paxos.leader.discovery.state.ErrorStatus.Type.INVALID_RESPONSE;
+import static com.slusarczykr.paxos.leader.discovery.state.ErrorStatus.Type.LOST_CONNECTION;
+
 @Component
 @Data
-public class ServerDetails {
+public class PaxosServer {
 
-    private static final Logger log = LoggerFactory.getLogger(ServerDetails.class);
+    private static final Logger log = LoggerFactory.getLogger(PaxosServer.class);
 
     private final AtomicInteger id = new AtomicInteger(0);
     private final AtomicLong term = new AtomicLong(0);
@@ -24,21 +28,23 @@ public class ServerDetails {
 
     private final AtomicBoolean leader = new AtomicBoolean(false);
 
+    private final ErrorStatus errorStatus = new ErrorStatus();
+
     @Value("${server.port}")
     private int serverPort;
 
     private final ServerDiscoveryConfiguration serverDiscoveryConfiguration;
 
-    public ServerDetails(ServerDiscoveryConfiguration serverDiscoveryConfiguration) {
+    public PaxosServer(ServerDiscoveryConfiguration serverDiscoveryConfiguration) {
         this.serverDiscoveryConfiguration = serverDiscoveryConfiguration;
     }
 
     @PostConstruct
     public void init() {
-        initServerDetails();
+        initPaxosServer();
     }
 
-    private void initServerDetails() {
+    private void initPaxosServer() {
         initServerId();
         incrementTerm();
     }
@@ -93,7 +99,33 @@ public class ServerDetails {
         return getLeader().get();
     }
 
+    public void demoteLeader() {
+        setLeader(false);
+    }
+
     public void setLeader(boolean leader) {
         getLeader().set(leader);
+    }
+
+    public boolean isInvalidResponseEnabled() {
+        return errorStatus.isEnabled(INVALID_RESPONSE);
+    }
+
+    public boolean isInfiniteRepliesEnabled() {
+        return errorStatus.isEnabled(INFINITE_REPLIES);
+    }
+
+    public boolean isLostConnectionEnabled() {
+        return errorStatus.isEnabled(LOST_CONNECTION);
+    }
+
+    public void enableError(ErrorStatus.Type errorType) {
+        log.debug("Enabling '{}' error", errorType);
+        errorStatus.enable(errorType);
+    }
+
+    public void disableError(ErrorStatus.Type errorType) {
+        log.debug("Disabling '{}' error", errorType);
+        errorStatus.disable(errorType);
     }
 }
