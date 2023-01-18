@@ -4,9 +4,9 @@ import java.util.Map;
 
 public interface ServerDiscoveryService {
 
-    Map<Integer, String> allServers();
+    Map<Integer, String> getAllServers();
 
-    Map<Integer, String> getServers();
+    Map<Integer, String> getAvailableServers();
 
     int getNumberOfAvailableServers();
 

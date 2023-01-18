@@ -135,7 +135,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     }
 
     private Set<String> getServerAddresses() {
-        return new HashSet<>(discoveryService.getServers().values());
+        return new HashSet<>(discoveryService.getAvailableServers().values());
     }
 
     @Override

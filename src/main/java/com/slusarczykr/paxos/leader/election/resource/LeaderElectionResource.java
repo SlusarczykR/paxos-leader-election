@@ -5,7 +5,7 @@ import com.slusarczykr.paxos.leader.api.RequestVote;
 import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.election.service.LeaderElectionService;
 import com.slusarczykr.paxos.leader.exception.PaxosLeaderElectionException;
-import com.slusarczykr.paxos.leader.starter.LeaderElectionStarter;
+import com.slusarczykr.paxos.leader.election.starter.LeaderElectionStarter;
 import com.slusarczykr.paxos.leader.vote.service.RequestVoteService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

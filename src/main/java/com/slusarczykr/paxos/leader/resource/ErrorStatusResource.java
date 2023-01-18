@@ -2,7 +2,7 @@ package com.slusarczykr.paxos.leader.resource;
 
 import com.slusarczykr.paxos.leader.discovery.state.ErrorStatus;
 import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
-import com.slusarczykr.paxos.leader.starter.LeaderElectionStarter;
+import com.slusarczykr.paxos.leader.election.starter.LeaderElectionStarter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpStatus;

@@ -51,12 +51,12 @@ public class ServerDiscoveryServiceImpl implements ServerDiscoveryService {
     }
 
     @Override
-    public Map<Integer, String> allServers() {
+    public Map<Integer, String> getAllServers() {
         return Collections.unmodifiableMap(paxosServers);
     }
 
     @Override
-    public Map<Integer, String> getServers() {
+    public Map<Integer, String> getAvailableServers() {
         return paxosServers.entrySet().stream()
                 .filter(Predicate.not(this::isCurrentHost).and(this::isAlive))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));

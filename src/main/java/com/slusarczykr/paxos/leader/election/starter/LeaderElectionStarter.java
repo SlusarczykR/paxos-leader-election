@@ -1,4 +1,4 @@
-package com.slusarczykr.paxos.leader.starter;
+package com.slusarczykr.paxos.leader.election.starter;
 
 import com.slusarczykr.paxos.leader.discovery.state.PaxosServer;
 import com.slusarczykr.paxos.leader.election.config.LeaderElectionProperties;
@@ -133,13 +133,9 @@ public class LeaderElectionStarter {
 
     private void cancelIfPresent(Future<?> task) {
         Optional.ofNullable(task).ifPresent(it -> {
-            log.debug("Canceling current task execution");
+            log.trace("Canceling current task execution");
             it.cancel(false);
         });
-    }
-
-    public CompletableFuture<Boolean> getLeaderCandidacy() {
-        return candidacy.get();
     }
 
     public void reset() {
