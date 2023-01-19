@@ -31,14 +31,15 @@ public class RequestVote extends AppendEntry implements Serializable {
 
         private boolean accepted;
         private long serverId;
+        private long term;
 
         @Data
         @NoArgsConstructor
         @EqualsAndHashCode(callSuper = true)
         public static class Accepted extends Response {
 
-            public Accepted(long serverId) {
-                super(true, serverId);
+            public Accepted(long serverId, long term) {
+                super(true, serverId, term);
             }
         }
 
@@ -47,8 +48,8 @@ public class RequestVote extends AppendEntry implements Serializable {
         @EqualsAndHashCode(callSuper = true)
         public static class Rejected extends Response {
 
-            public Rejected(long serverId) {
-                super(false, serverId);
+            public Rejected(long serverId, long term) {
+                super(false, serverId, term);
             }
         }
     }
