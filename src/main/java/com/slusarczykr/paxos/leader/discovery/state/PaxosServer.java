@@ -107,6 +107,10 @@ public class PaxosServer {
         getLeader().set(leader);
     }
 
+    public boolean isEnabled(ErrorStatus.Type type) {
+        return errorStatus.isEnabled(type);
+    }
+
     public boolean isInvalidResponseEnabled() {
         return errorStatus.isEnabled(INVALID_RESPONSE);
     }

@@ -7,13 +7,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
@@ -25,6 +29,13 @@ public class ErrorStatusResource {
     private final PaxosServer paxosServer;
     private final LeaderElectionStarter leaderElectionStarter;
     private final Converter<String, ErrorStatus.Type> errorStatusTypeConverter;
+
+    @GetMapping(value = "/statuses")
+    public ResponseEntity<Map<String, Boolean>> getErrorStatuses() {
+        Map<String, Boolean> errorStatuses = Arrays.stream(ErrorStatus.Type.values())
+                .collect(Collectors.toMap(Enum::name, paxosServer::isEnabled));
+        return new ResponseEntity<>(errorStatuses, HttpStatus.OK);
+    }
 
     @PostMapping(value = "/enable/{errorType}")
     public ResponseEntity<Void> enable(@PathVariable("errorType") String errorType) {
