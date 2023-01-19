@@ -28,7 +28,7 @@ public class RequestVoteServiceImpl implements RequestVoteService {
         boolean accepted = vote(candidateTerm);
         log.info(getServerCandidacyVotingStatusMessage(accepted, requestVote.getServerId()));
 
-        return requestVoteFactory.create(requestVote.getServerId(), toResponseStatus(accepted));
+        return requestVoteFactory.create(requestVote.getServerId(), paxosServer.getTermValue(), toResponseStatus(accepted));
     }
 
     private String getServerCandidacyVotingStatusMessage(boolean accepted, long candidateServerId) {

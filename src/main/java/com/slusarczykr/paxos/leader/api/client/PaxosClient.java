@@ -40,7 +40,7 @@ public class PaxosClient {
         this.paxosServer = paxosServer;
     }
 
-    public Optional<RequestVote.Response> requestCandidates(String serverLocation, RequestVote requestVote) throws PaxosLeaderElectionException {
+    public Optional<RequestVote.Response> sendRequestVote(String serverLocation, RequestVote requestVote) throws PaxosLeaderElectionException {
         String requestUrl = buildServerLeaderCandidacyVoteUrl(serverLocation);
         return sendRequest(requestUrl, requestVote, RequestVote.Response.class);
     }

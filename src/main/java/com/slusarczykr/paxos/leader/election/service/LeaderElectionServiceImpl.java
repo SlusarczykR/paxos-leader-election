@@ -52,7 +52,7 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     private boolean candidateForLeader() {
         log.info("Starting the candidacy of the server with id {} for the leader...", paxosServer.getIdValue());
         RequestVote requestVote = createElectionVote();
-        List<RequestVote.Response> responseRequestVotes = sendRequestVoteToCandidates(requestVote);
+        List<RequestVote.Response> responseRequestVotes = sendRequestVoteToFollowers(requestVote);
         boolean accepted = checkAcceptanceMajority(responseRequestVotes);
         paxosServer.setLeader(accepted);
 
@@ -63,16 +63,16 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
         return accepted;
     }
 
-    private List<RequestVote.Response> sendRequestVoteToCandidates(RequestVote requestVote) {
+    private List<RequestVote.Response> sendRequestVoteToFollowers(RequestVote requestVote) {
         return getServerAddresses().stream()
-                .map(serverLocation -> requestCandidates(requestVote, serverLocation))
+                .map(serverLocation -> sendRequestVote(requestVote, serverLocation))
                 .flatMap(Optional::stream)
                 .toList();
     }
 
     @SneakyThrows
-    private Optional<RequestVote.Response> requestCandidates(RequestVote requestVote, String serverLocation) {
-        return paxosClient.requestCandidates(serverLocation, requestVote);
+    private Optional<RequestVote.Response> sendRequestVote(RequestVote requestVote, String serverLocation) {
+        return paxosClient.sendRequestVote(serverLocation, requestVote);
     }
 
     private <T extends RequestVote.Response> boolean checkAcceptanceMajority(List<T> responseRequestVotes) {
@@ -90,8 +90,24 @@ public class LeaderElectionServiceImpl implements LeaderElectionService {
     }
 
     private <T extends RequestVote.Response> Map<Boolean, List<T>> getCandidatesResponsesByAcceptance(List<T> responseRequestVotes) {
+        long currentTerm = paxosServer.getTermValue();
+
         return responseRequestVotes.stream()
+                .map(it -> negateVoteAcceptanceIfCorrupted(it, currentTerm))
                 .collect(Collectors.partitioningBy(RequestVote.Response::isAccepted));
+    }
+
+    private <T extends RequestVote.Response> T negateVoteAcceptanceIfCorrupted(T responseRequestVote, long currentTerm) {
+        if (isVoteCorrupted(responseRequestVote, currentTerm)) {
+            log.debug("Vote from server with id '{}' is corrupted. Acceptance value will be corrected", responseRequestVote.getServerId());
+            responseRequestVote.setAccepted(!responseRequestVote.isAccepted());
+        }
+        return responseRequestVote;
+    }
+
+    private <T extends RequestVote.Response> boolean isVoteCorrupted(T responseRequestVote, long currentTerm) {
+        return responseRequestVote.isAccepted() && responseRequestVote.getTerm() != currentTerm
+                || !responseRequestVote.isAccepted() && currentTerm > responseRequestVote.getTerm();
     }
 
     private <T extends RequestVote.Response> boolean isAcceptedByMajority(Map<Boolean, List<T>> promisesByAcceptance) {
